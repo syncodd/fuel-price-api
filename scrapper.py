@@ -2,6 +2,7 @@
 from url_list import URLS
 from fuel_data import FuelData
 
+import math
 import requests
 import pandas as pd
 
@@ -10,20 +11,27 @@ class FuelPriceScrapper:
     def __init__(self):
 
         self.fuel_data_list = []
+        self.fuel_data_list: list[FuelData]
 
-    def scrap_tppd(self) -> list[FuelData]:
+    def scrap_base(self, url) -> pd.DataFrame:
 
-        URL = URLS["tppd"]
-
-        res = requests.get(URL)
+        res = requests.get(url)
 
         html_tables = pd.read_html(res.content)
 
         df = html_tables[0]
 
-        types = df.columns[1:]
+        return df
+    
+    def scrap_tppd(self) -> list[FuelData]:
 
-        self.fuel_data_list = []
+        URL = URLS.get("tppd")
+
+        if not URL: return
+
+        df = self.scrap_base(URL)
+
+        types = df.columns[1:]
 
         for district_values in df.values:
 
@@ -41,7 +49,50 @@ class FuelPriceScrapper:
                 )
         
         return self.fuel_data_list
+    
+    def scrap_po(self) -> list[FuelData]:
+
+        URL = URLS.get("po")
+
+        if not URL: return
+
+        df = self.scrap_base(URL)
+
+        types = df.columns[1:]
+
+        for district_values in df.values:
+
+            district = district_values[0]
+
+            for i, val in enumerate(district_values[1:]):
+                self.fuel_data_list.append(
+                    FuelData(
+                        name=types[i],
+                        district=district,
+                        price=float(val.split(' ')[0]),
+                        unit=val.split(' ')[-3] if "TL" in val else "",
+                        source="PO"
+                    )
+                )
+
+        return self.fuel_data_list
+
+    def scrap(self):
+
+        self.scrap_tppd()
+        self.scrap_po()
+    
+    def get_avg_by_district_and_name(self, district="", name=[]):
+
+        price_list = [fuel_price.price for fuel_price in self.fuel_data_list if fuel_price.is_district_in(district) and fuel_price.is_name_in(name)]
+        
+        return 0 if len(price_list) == 0 else sum(price_list) / len(price_list)
+
 
 if __name__ == '__main__':
 
-    FuelPriceScrapper().scrap_tppd()
+    scrapper = FuelPriceScrapper()
+
+    scrapper.scrap()
+    print(scrapper.get_avg_by_district_and_name("istanbul", ["KURŞUNSUZ BENZİN (TL/LT)",
+                                                             "V/Max Kurşunsuz 95"]))
