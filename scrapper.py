@@ -1,6 +1,6 @@
 
-from url_list import URLS
-from fuel_data import FuelData
+from utils.fuel_price_scrapper.url_list import URLS
+from utils.fuel_price_scrapper.fuel_data import FuelData
 
 import math
 import requests
